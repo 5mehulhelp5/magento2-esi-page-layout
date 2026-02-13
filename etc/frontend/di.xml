@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright (c) 2026. Volodymyr Hryvinskyi. All rights reserved.
+ * Author: Volodymyr Hryvinskyi <volodymyr@hryvinskyi.com>
+ * GitHub: https://github.com/hryvinskyi
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+
+    <type name="Magento\Framework\View\Layout">
+        <plugin name="disable_esi_layout_element_rendering_when_varnish_enabled" disabled="true"/>
+        <plugin name="hryvinskyi_esi_skip_render_layout_element"
+                type="Hryvinskyi\EsiPageLayout\Plugin\SkipRenderLayoutElementPlugin"
+                sortOrder="10"/>
+    </type>
+
+    <type name="Magento\PageCache\Controller\Block\Esi">
+        <plugin name="hryvinskyi_esi_restore_context"
+                type="Hryvinskyi\EsiPageLayout\Plugin\RestoreEsiContextPlugin"/>
+    </type>
+
+</config>

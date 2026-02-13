@@ -1,0 +1,17 @@
+{
+    "name": "hryvinskyi/magento2-esi-page-layout",
+    "description": "Ensures correct theme context and cache segmentation for Varnish ESI block requests in multi-theme Magento setups",
+    "type": "magento2-module",
+    "require": {
+        "magento/framework": "*",
+        "magento/module-page-cache": "*"
+    },
+    "autoload": {
+        "files": [
+            "registration.php"
+        ],
+        "psr-4": {
+            "Hryvinskyi\\EsiPageLayout\\": ""
+        }
+    }
+}
