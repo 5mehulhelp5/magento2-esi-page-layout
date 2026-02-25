@@ -25,6 +25,34 @@ Before plugin on `Magento\PageCache\Controller\Block\Esi::execute()`. Reads `esi
 
 Around plugin on `Magento\Framework\View\Layout::renderNonCachedElement()`. When Varnish full-page cache is active and the page is cacheable, blocks with a TTL are skipped (return empty string) since they will be served via ESI includes instead.
 
+## Known Issues with Third-Party Modules
+
+### Amasty: Incorrect Entity-Specific Handle Registration
+
+> **Warning:** Avoid using Amasty modules if you want your site to be solid and have good performance.
+
+Amasty modules (`amasty/module-shop-by-brand`, `amasty/shopby`) have a bug in their category controllers
+where they call `addPageLayoutHandles()` with both `type` and `id` parameters in a single call without
+setting `$entitySpecific = false`:
+
+```php
+// Amasty (BROKEN) — marks ALL handles as entity-specific, including page-type handles
+$page->addPageLayoutHandles(['type' => $type, 'id' => $category->getId()], 'catalog_category_view');
+```
+
+Magento core does this correctly with separate calls:
+
+```php
+// Magento core (CORRECT) — type handles are NOT entity-specific, only id handles are
+$page->addPageLayoutHandles(['type' => $pageType], null, false);
+$page->addPageLayoutHandles(['id' => $category->getId()]);
+```
+
+This causes `catalog_category_view_type_layered` to be registered as an entity-specific handle.
+Magento's `ProcessLayoutRenderElement` observer then strips it from ESI URLs via `array_diff()`,
+so when Varnish fetches the ESI block, the layout is loaded without the layered navigation handle,
+resulting in broken block rendering on category and brand pages.
+
 ## Installation
 
 ```bash
