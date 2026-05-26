@@ -12,7 +12,8 @@
     ],
     "require": {
         "magento/framework": "*",
-        "magento/module-page-cache": "*"
+        "magento/module-page-cache": "*",
+        "magento/module-customer": "*"
     },
     "autoload": {
         "files": [

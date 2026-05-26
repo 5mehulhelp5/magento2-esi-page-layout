@@ -14,11 +14,13 @@ use Magento\Framework\View\Layout\LayoutCacheKeyInterface;
 use Magento\PageCache\Controller\Block\Esi;
 
 /**
- * Restores ESI theme context from request parameters during ESI processing.
+ * Restores ESI theme and customer authentication context during ESI processing.
  *
- * When Varnish fetches an ESI block via /page_cache/block/esi, this plugin reads the
- * esi_theme parameter that was appended by the observer, stores it in the EsiContextManager,
- * sets the correct design theme, and adds a layout cache key for proper cache segmentation.
+ * When Varnish fetches an ESI block via /page_cache/block/esi, this plugin reads
+ * the esi_theme and esi_auth parameters appended by the observer, restores the
+ * design theme, and adds layout cache keys so Magento's internal layout cache is
+ * segmented per theme and per logged-in/out state - matching the URL-level
+ * segmentation that Varnish already performs.
  */
 class RestoreEsiContextPlugin
 {
@@ -35,16 +37,29 @@ class RestoreEsiContextPlugin
     }
 
     /**
-     * Read esi_theme from request, store in context, set theme and cache key.
+     * Restore theme and add cache keys for theme and authentication state.
      *
      * Runs before Esi::execute() which internally calls _getBlocks() -> loadLayout().
      * By the time loadLayout() runs, the design theme is overridden so layout files
-     * are resolved from the correct theme.
+     * are resolved from the correct theme, and the layout cache keys are in place so
+     * the cache is segmented per theme and per logged-in/out state.
      *
      * @param Esi $subject
      * @return void
      */
     public function beforeExecute(Esi $subject): void
+    {
+        $this->restoreThemeContext($subject);
+        $this->segmentCacheByAuthParam($subject);
+    }
+
+    /**
+     * Read esi_theme from request, store it in context, set theme and add a theme cache key.
+     *
+     * @param Esi $subject
+     * @return void
+     */
+    private function restoreThemeContext(Esi $subject): void
     {
         $esiTheme = $subject->getRequest()->getParam('esi_theme');
 
@@ -55,5 +70,26 @@ class RestoreEsiContextPlugin
         $this->esiContextManager->setThemePath($esiTheme);
         $this->design->setDesignTheme($esiTheme, 'frontend');
         $this->layoutCacheKey->addCacheKeys(['esi_theme_' . $esiTheme]);
+    }
+
+    /**
+     * Add a layout cache key derived from the esi_auth URL parameter.
+     *
+     * The observer bakes the auth state into the ESI URL so Varnish caches logged-in
+     * and logged-out responses separately. Mirroring it here keeps Magento's internal
+     * layout cache aligned with the URL-level segmentation.
+     *
+     * @param Esi $subject
+     * @return void
+     */
+    private function segmentCacheByAuthParam(Esi $subject): void
+    {
+        $esiAuth = $subject->getRequest()->getParam('esi_auth');
+
+        if ($esiAuth === null) {
+            return;
+        }
+
+        $this->layoutCacheKey->addCacheKeys(['esi_auth_' . ((int)$esiAuth === 1 ? 1 : 0)]);
     }
 }

@@ -8,6 +8,8 @@ declare(strict_types=1);
 
 namespace Hryvinskyi\EsiPageLayout\Observer;
 
+use Magento\Customer\Model\Context as CustomerContext;
+use Magento\Framework\App\Http\Context as HttpContext;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Magento\Framework\Serialize\Serializer\Base64Json;
@@ -39,13 +41,15 @@ class ProcessLayoutRenderElement implements ObserverInterface
      * @param Json $jsonSerializer
      * @param Base64Json $base64jsonSerializer
      * @param DesignInterface $design
+     * @param HttpContext $httpContext
      */
     public function __construct(
         private readonly Config $config,
         private readonly EntitySpecificHandlesList $entitySpecificHandlesList,
         private readonly Json $jsonSerializer,
         private readonly Base64Json $base64jsonSerializer,
-        private readonly DesignInterface $design
+        private readonly DesignInterface $design,
+        private readonly HttpContext $httpContext
     ) {
     }
 
@@ -113,6 +117,10 @@ class ProcessLayoutRenderElement implements ObserverInterface
         if ($themePath) {
             $params['esi_theme'] = $themePath;
         }
+
+        // Varnish caches ESI subrequests by URL, so the auth state must be part of the URL
+        // to keep logged-in and logged-out responses in separate cache entries.
+        $params['esi_auth'] = $this->httpContext->getValue(CustomerContext::CONTEXT_AUTH) ? 1 : 0;
 
         $url = $block->getUrl('page_cache/block/esi', $params);
 

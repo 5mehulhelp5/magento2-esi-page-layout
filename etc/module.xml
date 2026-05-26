@@ -8,6 +8,7 @@
     <module name="Hryvinskyi_EsiPageLayout">
         <sequence>
             <module name="Magento_PageCache"/>
+            <module name="Magento_Customer"/>
         </sequence>
     </module>
 </config>
