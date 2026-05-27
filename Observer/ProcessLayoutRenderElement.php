@@ -18,6 +18,7 @@ use Magento\Framework\View\DesignInterface;
 use Magento\Framework\View\Element\AbstractBlock;
 use Magento\Framework\View\EntitySpecificHandlesList;
 use Magento\PageCache\Model\Config;
+use Magento\Store\Model\StoreManagerInterface;
 
 /**
  * Replaces Magento\PageCache\Observer\ProcessLayoutRenderElement to inject
@@ -42,6 +43,7 @@ class ProcessLayoutRenderElement implements ObserverInterface
      * @param Base64Json $base64jsonSerializer
      * @param DesignInterface $design
      * @param HttpContext $httpContext
+     * @param StoreManagerInterface $storeManager
      */
     public function __construct(
         private readonly Config $config,
@@ -49,7 +51,8 @@ class ProcessLayoutRenderElement implements ObserverInterface
         private readonly Json $jsonSerializer,
         private readonly Base64Json $base64jsonSerializer,
         private readonly DesignInterface $design,
-        private readonly HttpContext $httpContext
+        private readonly HttpContext $httpContext,
+        private readonly StoreManagerInterface $storeManager
     ) {
     }
 
@@ -121,6 +124,11 @@ class ProcessLayoutRenderElement implements ObserverInterface
         // Varnish caches ESI subrequests by URL, so the auth state must be part of the URL
         // to keep logged-in and logged-out responses in separate cache entries.
         $params['esi_auth'] = $this->httpContext->getValue(CustomerContext::CONTEXT_AUTH) ? 1 : 0;
+
+        // When multiple stores share the same hostname (no store code in URL), the ESI URL is
+        // otherwise identical across stores, so Varnish would serve the first cached response
+        // for every store. Including the store code forces per-store URLs.
+        $params['esi_store'] = $this->storeManager->getStore()->getCode();
 
         $url = $block->getUrl('page_cache/block/esi', $params);
 

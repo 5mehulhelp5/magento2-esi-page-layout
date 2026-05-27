@@ -9,18 +9,20 @@ declare(strict_types=1);
 namespace Hryvinskyi\EsiPageLayout\Plugin;
 
 use Hryvinskyi\EsiPageLayout\Api\EsiContextManagerInterface;
+use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\View\DesignInterface;
 use Magento\Framework\View\Layout\LayoutCacheKeyInterface;
 use Magento\PageCache\Controller\Block\Esi;
+use Magento\Store\Model\StoreManagerInterface;
 
 /**
- * Restores ESI theme and customer authentication context during ESI processing.
+ * Restores ESI theme, store, and customer authentication context during ESI processing.
  *
  * When Varnish fetches an ESI block via /page_cache/block/esi, this plugin reads
- * the esi_theme and esi_auth parameters appended by the observer, restores the
- * design theme, and adds layout cache keys so Magento's internal layout cache is
- * segmented per theme and per logged-in/out state - matching the URL-level
- * segmentation that Varnish already performs.
+ * the esi_theme, esi_store and esi_auth parameters appended by the observer, restores
+ * the design theme and current store, and adds layout cache keys so Magento's internal
+ * layout cache is segmented per theme, store and logged-in/out state - matching the
+ * URL-level segmentation that Varnish already performs.
  */
 class RestoreEsiContextPlugin
 {
@@ -28,11 +30,13 @@ class RestoreEsiContextPlugin
      * @param EsiContextManagerInterface $esiContextManager
      * @param DesignInterface $design
      * @param LayoutCacheKeyInterface $layoutCacheKey
+     * @param StoreManagerInterface $storeManager
      */
     public function __construct(
         private readonly EsiContextManagerInterface $esiContextManager,
         private readonly DesignInterface $design,
-        private readonly LayoutCacheKeyInterface $layoutCacheKey
+        private readonly LayoutCacheKeyInterface $layoutCacheKey,
+        private readonly StoreManagerInterface $storeManager
     ) {
     }
 
@@ -49,8 +53,36 @@ class RestoreEsiContextPlugin
      */
     public function beforeExecute(Esi $subject): void
     {
+        $this->restoreStoreContext($subject);
         $this->restoreThemeContext($subject);
         $this->segmentCacheByAuthParam($subject);
+    }
+
+    /**
+     * Read esi_store from the request, switch the active store, and add a store cache key.
+     *
+     * Required when multiple stores share the same hostname without a store code in the URL
+     * path: the ESI subrequest would otherwise be resolved against the host's default store,
+     * not the store the parent page was rendered for.
+     *
+     * @param Esi $subject
+     * @return void
+     */
+    private function restoreStoreContext(Esi $subject): void
+    {
+        $esiStore = $subject->getRequest()->getParam('esi_store');
+
+        if (!$esiStore) {
+            return;
+        }
+
+        try {
+            $this->storeManager->setCurrentStore($esiStore);
+        } catch (NoSuchEntityException $e) {
+            return;
+        }
+
+        $this->layoutCacheKey->addCacheKeys(['esi_store_' . $esiStore]);
     }
 
     /**
